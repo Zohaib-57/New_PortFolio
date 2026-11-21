@@ -1501,11 +1501,15 @@
         }
 
         function notifyVisitor() {
-          // Prevent firing multiple times during the same browser session
-          if (sessionStorage.getItem("portfolio_visit_logged")) {
+          // On localhost or during testing, allow sending notification.
+          // In production, throttle so it fires at most once per 60 seconds per tab.
+          const lastLogged = sessionStorage.getItem("portfolio_last_visit_time");
+          const now = Date.now();
+          if (lastLogged && (now - parseInt(lastLogged, 10)) < 60000 && !window.location.hostname.includes("localhost")) {
+            console.log("[Portfolio Tracker] Notification throttled for this session.");
             return;
           }
-          sessionStorage.setItem("portfolio_visit_logged", "true");
+          sessionStorage.setItem("portfolio_last_visit_time", now.toString());
 
           const visitor = detectVisitorDetails();
 
@@ -1525,11 +1529,11 @@
               embeds: [
                 {
                   title: "⚡ New Visitor on Portfolio!",
-                  color: 0xbcf34a, // lime color in dec
+                  color: 0xbcf34a, // lime color
                   fields: [
                     {
                       name: "🔗 Origin Platform",
-                      value: visitor.originPlatform,
+                      value: visitor.originPlatform || "Direct",
                       inline: true,
                     },
                     {
@@ -1539,22 +1543,22 @@
                     },
                     {
                       name: "🌐 Browser",
-                      value: visitor.browser,
+                      value: visitor.browser || "Unknown",
                       inline: true,
                     },
                     {
                       name: "📐 Screen Resolution",
-                      value: visitor.screenResolution,
+                      value: visitor.screenResolution || "Unknown",
                       inline: true,
                     },
                     {
                       name: "🕒 Timezone",
-                      value: visitor.timezone,
+                      value: visitor.timezone || "Unknown",
                       inline: true,
                     },
                     {
                       name: "📄 Referrer URL",
-                      value: visitor.referrer,
+                      value: visitor.referrer || "None",
                       inline: false,
                     },
                   ],
@@ -1568,9 +1572,19 @@
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload),
-            }).catch(function (err) {
-              console.warn("Could not dispatch visitor webhook:", err);
-            });
+            })
+              .then(function (res) {
+                if (res.ok) {
+                  console.log("%c[Portfolio Tracker] Discord alert sent successfully! Status: " + res.status, "color: #bcf34a; font-weight: bold;");
+                } else {
+                  console.warn("[Portfolio Tracker] Discord returned status:", res.status);
+                }
+              })
+              .catch(function (err) {
+                console.warn("[Portfolio Tracker] Could not dispatch visitor webhook:", err);
+              });
+          } else {
+            console.warn("[Portfolio Tracker] No Discord Webhook URL provided.");
           }
         }
 
