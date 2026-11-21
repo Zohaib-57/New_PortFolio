@@ -676,6 +676,59 @@
         align-items: center;
       }
 
+      .recruiter-box {
+        margin-top: 45px;
+        max-width: 620px;
+        background: rgba(16, 21, 10, 0.08);
+        border: 1px solid rgba(16, 21, 10, 0.25);
+        border-radius: 8px;
+        padding: 24px;
+      }
+
+      .recruiter-box label {
+        display: block;
+        font-weight: 700;
+        font-size: 14px;
+        margin-bottom: 12px;
+        color: #10150a;
+      }
+
+      .recruiter-input-row {
+        display: flex;
+        gap: 10px;
+      }
+
+      .recruiter-input-row input {
+        flex: 1;
+        background: #ffffff;
+        border: 1px solid #10150a;
+        border-radius: 4px;
+        padding: 13px 16px;
+        font-family: inherit;
+        font-size: 14px;
+        color: #11150a;
+        outline: none;
+        transition: box-shadow 0.2s ease, border-color 0.2s ease;
+      }
+
+      .recruiter-input-row input:focus {
+        box-shadow: 0 0 0 3px rgba(16, 21, 10, 0.25);
+      }
+
+      .recruiter-box small {
+        display: block;
+        margin-top: 10px;
+        font-size: 12px;
+        color: #303e0e;
+        font-family: var(--font-mono);
+      }
+
+      @media (max-width: 600px) {
+        .recruiter-input-row {
+          flex-direction: column;
+        }
+      }
+
       .contact .btn {
         border-color: #10150a;
         color: #10150a;
@@ -1291,6 +1344,16 @@
               Copy: zohaibabbas8557@gmail.com
             </button>
           </div>
+
+          <!-- Recruiter & Visitor Direct Profile Connect -->
+          <div class="recruiter-box">
+            <label for="visitorProfileInput">💼 Visiting from LinkedIn or looking to hire? Drop your name or LinkedIn profile:</label>
+            <div class="recruiter-input-row">
+              <input type="text" id="visitorProfileInput" placeholder="e.g. linkedin.com/in/recruiter or John from Company" />
+              <button type="button" id="sendProfileBtn" class="btn primary-contact">Connect ⚡</button>
+            </div>
+            <small>Pings Zohaib instantly on Discord with your profile.</small>
+          </div>
         </div>
       </section>
     </main>
@@ -1412,24 +1475,104 @@
         }
 
         /* ==========================================================================
-         4. VISITOR & PLATFORM DETECTION TRACKER
+         4. RECRUITER & VISITOR DIRECT PROFILE SUBMISSION
+         ========================================================================== */
+        const sendProfileBtn = document.getElementById("sendProfileBtn");
+        const visitorProfileInput = document.getElementById("visitorProfileInput");
+
+        function submitVisitorProfile() {
+          if (!visitorProfileInput) return;
+          const val = visitorProfileInput.value.trim();
+          if (!val) {
+            showToast("Please enter your name or profile URL");
+            visitorProfileInput.focus();
+            return;
+          }
+
+          const visitor = detectVisitorDetails();
+          showToast("Sending your profile to Zohaib...");
+
+          // Fetch location data to attach to the recruiter card
+          fetch("https://ipwho.is/")
+            .then(function (r) { return r.json(); })
+            .catch(function () { return null; })
+            .then(function (geo) {
+              const locationStr = geo && geo.success ? (geo.city + ", " + geo.region + ", " + geo.country + " " + (geo.flag ? geo.flag.emoji : "")) : visitor.timezone;
+              const orgStr = geo && geo.connection ? (geo.connection.org || geo.connection.isp) : "Unknown Network";
+
+              const payload = {
+                embeds: [
+                  {
+                    title: "💼 Direct Recruiter / Visitor Profile Connected!",
+                    color: 0x0a66c2, // LinkedIn Blue
+                    fields: [
+                      { name: "👤 Recruiter / Visitor Profile", value: "**" + val + "**", inline: false },
+                      { name: "📍 Location", value: locationStr, inline: true },
+                      { name: "🏢 Company / Network", value: orgStr, inline: true },
+                      { name: "💻 Device / OS", value: visitor.platform + " (" + visitor.deviceType + ")", inline: true },
+                      { name: "🌐 Browser", value: visitor.browser, inline: true },
+                      { name: "🔗 Origin", value: visitor.originPlatform, inline: true },
+                    ],
+                    footer: { text: "Submitted via Portfolio Direct Connect" },
+                    timestamp: new Date().toISOString()
+                  }
+                ]
+              };
+
+              if (DISCORD_WEBHOOK_URL) {
+                fetch(DISCORD_WEBHOOK_URL, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(payload)
+                }).then(function () {
+                  showToast("✓ Thank you! Connected with Zohaib.");
+                  visitorProfileInput.value = "";
+                }).catch(function () {
+                  showToast("✓ Thank you! Your profile was saved.");
+                });
+              } else {
+                showToast("✓ Saved: " + val);
+                visitorProfileInput.value = "";
+              }
+            });
+        }
+
+        if (sendProfileBtn) {
+          sendProfileBtn.addEventListener("click", submitVisitorProfile);
+        }
+        if (visitorProfileInput) {
+          visitorProfileInput.addEventListener("keydown", function (e) {
+            if (e.key === "Enter") {
+              submitVisitorProfile();
+            }
+          });
+        }
+
+        /* ==========================================================================
+         5. VISITOR, PLATFORM & LINKEDIN PROFILE DETECTION TRACKER
          ==========================================================================
          Detects:
+         - Identified profile tags via URL parameters (e.g. ?who=Recruiter_Name or ?linkedin=url)
          - Operating System (Windows, Mac, iOS, Android, Linux)
          - Browser (Chrome, Safari, Firefox, Edge, etc.)
          - Referring platform (LinkedIn, GitHub, Twitter, Google, Direct)
-         - Screen resolution & Device Type (Desktop, Tablet, Mobile)
-         - Timezone & Local visit timestamp
-         
-         OPTIONAL NOTIFICATION CONFIGURATION:
-         To receive an instant alert on your phone/desktop whenever someone visits,
-         paste your Discord Webhook URL below:
+         - Geographic Location & Company/ISP Network (via ipwho.is)
          ========================================================================== */
         const DISCORD_WEBHOOK_URL =
-          "https://discord.com/api/webhooks/1573799992781439047/14_6MmsjhCgyT6lLxuvzBF3yLsAZjU_8RhlMt8ft8ShUIUHjr-cIHbW4vvz4JhiA9Mzh"; // e.g. "https://discord.com/api/webhooks/YOUR_ID/YOUR_TOKEN"
+          "https://discord.com/api/webhooks/1573799992781439047/14_6MmsjhCgyT6lLxuvzBF3yLsAZjU_8RhlMt8ft8ShUIUHjr-cIHbW4vvz4JhiA9Mzh";
 
         function detectVisitorDetails() {
           const ua = navigator.userAgent;
+
+          // Check if custom URL parameter identifies the visitor (e.g. sent in LinkedIn DM or resume)
+          const urlParams = new URLSearchParams(window.location.search);
+          const taggedProfile =
+            urlParams.get("visitor") ||
+            urlParams.get("who") ||
+            urlParams.get("name") ||
+            urlParams.get("linkedin") ||
+            urlParams.get("recruiter") ||
+            urlParams.get("company");
 
           // Detect OS / Platform
           let platform = "Unknown OS";
@@ -1442,10 +1585,8 @@
           // Detect Browser
           let browser = "Unknown Browser";
           if (/Edg\//i.test(ua)) browser = "Microsoft Edge";
-          else if (/Chrome\//i.test(ua) && !/Edg\//i.test(ua))
-            browser = "Chrome";
-          else if (/Safari\//i.test(ua) && !/Chrome\//i.test(ua))
-            browser = "Safari";
+          else if (/Chrome\//i.test(ua) && !/Edg\//i.test(ua)) browser = "Chrome";
+          else if (/Safari\//i.test(ua) && !/Chrome\//i.test(ua)) browser = "Safari";
           else if (/Firefox\//i.test(ua)) browser = "Firefox";
 
           // Detect Referrer / Platform origin
@@ -1457,15 +1598,9 @@
               const host = refUrl.hostname.toLowerCase();
               if (host.includes("linkedin.com")) originPlatform = "LinkedIn";
               else if (host.includes("github.com")) originPlatform = "GitHub";
-              else if (host.includes("google."))
-                originPlatform = "Google Search";
-              else if (host.includes("twitter.com") || host.includes("x.com"))
-                originPlatform = "Twitter / X";
-              else if (
-                host.includes("facebook.com") ||
-                host.includes("instagram.com")
-              )
-                originPlatform = "Meta (FB / IG)";
+              else if (host.includes("google.")) originPlatform = "Google Search";
+              else if (host.includes("twitter.com") || host.includes("x.com")) originPlatform = "Twitter / X";
+              else if (host.includes("facebook.com") || host.includes("instagram.com")) originPlatform = "Meta (FB / IG)";
               else originPlatform = refUrl.hostname;
             } catch (e) {
               originPlatform = referrer;
@@ -1475,16 +1610,16 @@
           // Screen & Device
           const width = window.innerWidth || screen.width;
           const height = window.innerHeight || screen.height;
-          const deviceType =
-            width > 900 ? "Desktop" : width > 560 ? "Tablet" : "Mobile";
+          const deviceType = width > 900 ? "Desktop" : (width > 560 ? "Tablet" : "Mobile");
 
-          // Timezone & Language
+          // Timezone
           let timezone = "Unknown";
           try {
             timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
           } catch (e) {}
 
           const visitorData = {
+            taggedProfile: taggedProfile,
             originPlatform: originPlatform,
             referrer: referrer || "None",
             platform: platform,
@@ -1492,7 +1627,6 @@
             deviceType: deviceType,
             screenResolution: width + "x" + height,
             timezone: timezone,
-            language: navigator.language || "Unknown",
             visitTime: new Date().toLocaleString(),
             page: window.location.href,
           };
@@ -1501,8 +1635,6 @@
         }
 
         function notifyVisitor() {
-          // On localhost or during testing, allow sending notification.
-          // In production, throttle so it fires at most once per 60 seconds per tab.
           const lastLogged = sessionStorage.getItem("portfolio_last_visit_time");
           const now = Date.now();
           if (lastLogged && (now - parseInt(lastLogged, 10)) < 60000 && !window.location.hostname.includes("localhost")) {
@@ -1512,80 +1644,67 @@
           sessionStorage.setItem("portfolio_last_visit_time", now.toString());
 
           const visitor = detectVisitorDetails();
+          console.log("%c[Portfolio Tracker] Visitor detected:", "color: #bcf34a; font-weight: bold;", visitor);
 
-          // Log for local diagnostics
-          console.log(
-            "%c[Portfolio Tracker] Visitor detected:",
-            "color: #bcf34a; font-weight: bold;",
-            visitor,
-          );
+          if (!DISCORD_WEBHOOK_URL || !DISCORD_WEBHOOK_URL.startsWith("https://discord.com/api/webhooks/")) {
+            return;
+          }
 
-          // If Discord Webhook is configured, dispatch the alert
-          if (
-            DISCORD_WEBHOOK_URL &&
-            DISCORD_WEBHOOK_URL.startsWith("https://discord.com/api/webhooks/")
-          ) {
-            const payload = {
-              embeds: [
-                {
-                  title: "⚡ New Visitor on Portfolio!",
-                  color: 0xbcf34a, // lime color
-                  fields: [
-                    {
-                      name: "🔗 Origin Platform",
-                      value: visitor.originPlatform || "Direct",
-                      inline: true,
-                    },
-                    {
-                      name: "💻 Device / OS",
-                      value: visitor.platform + " (" + visitor.deviceType + ")",
-                      inline: true,
-                    },
-                    {
-                      name: "🌐 Browser",
-                      value: visitor.browser || "Unknown",
-                      inline: true,
-                    },
-                    {
-                      name: "📐 Screen Resolution",
-                      value: visitor.screenResolution || "Unknown",
-                      inline: true,
-                    },
-                    {
-                      name: "🕒 Timezone",
-                      value: visitor.timezone || "Unknown",
-                      inline: true,
-                    },
-                    {
-                      name: "📄 Referrer URL",
-                      value: visitor.referrer || "None",
-                      inline: false,
-                    },
-                  ],
-                  footer: { text: "Visit time: " + visitor.visitTime },
-                  timestamp: new Date().toISOString(),
-                },
-              ],
-            };
+          // Fetch IP Geolocation and Company Network information
+          fetch("https://ipwho.is/")
+            .then(function (r) { return r.json(); })
+            .catch(function () { return null; })
+            .then(function (geo) {
+              const locationStr = geo && geo.success ? (geo.city + ", " + geo.region + ", " + geo.country + " " + (geo.flag ? geo.flag.emoji : "")) : visitor.timezone;
+              const orgStr = geo && geo.connection ? (geo.connection.org || geo.connection.isp) : "Unknown Company / Network";
+              const ipStr = geo && geo.ip ? geo.ip : "Direct";
 
-            fetch(DISCORD_WEBHOOK_URL, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-            })
-              .then(function (res) {
+              const fields = [
+                { name: "🔗 Origin Platform", value: visitor.originPlatform || "Direct", inline: true },
+                { name: "📍 Location", value: locationStr, inline: true },
+                { name: "🏢 Company / Network", value: orgStr, inline: true },
+                { name: "💻 Device / OS", value: visitor.platform + " (" + visitor.deviceType + ")", inline: true },
+                { name: "🌐 Browser", value: visitor.browser || "Unknown", inline: true },
+                { name: "📐 Resolution", value: visitor.screenResolution || "Unknown", inline: true }
+              ];
+
+              // If a tagged profile was in the URL (e.g. ?who=RecruiterName)
+              if (visitor.taggedProfile) {
+                fields.unshift({
+                  name: "🎯 Identified Visitor / Profile",
+                  value: "**" + visitor.taggedProfile + "**",
+                  inline: false
+                });
+              }
+
+              if (visitor.referrer && visitor.referrer !== "None") {
+                fields.push({ name: "📄 Referrer URL", value: visitor.referrer, inline: false });
+              }
+
+              const payload = {
+                embeds: [
+                  {
+                    title: visitor.taggedProfile ? "🎯 Identified Visitor on Portfolio!" : "⚡ New Visitor on Portfolio!",
+                    color: visitor.taggedProfile ? 0x0a66c2 : 0xbcf34a,
+                    fields: fields,
+                    footer: { text: "Visit time: " + visitor.visitTime + " · IP: " + ipStr },
+                    timestamp: new Date().toISOString(),
+                  },
+                ],
+              };
+
+              fetch(DISCORD_WEBHOOK_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              }).then(function (res) {
                 if (res.ok) {
                   console.log("%c[Portfolio Tracker] Discord alert sent successfully! Status: " + res.status, "color: #bcf34a; font-weight: bold;");
-                } else {
-                  console.warn("[Portfolio Tracker] Discord returned status:", res.status);
                 }
-              })
-              .catch(function (err) {
+              }).catch(function (err) {
                 console.warn("[Portfolio Tracker] Could not dispatch visitor webhook:", err);
               });
-          } else {
-            console.warn("[Portfolio Tracker] No Discord Webhook URL provided.");
-          }
+            });
         }
 
         // Run on page load
